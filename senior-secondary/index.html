@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Editable Admission Form - Drag & Drop Version</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    margin: 0; padding: 10px;
+    background: #f3f5f3;
+  }
+  .page-wrap {
+    width: 210mm;
+    height: 297mm;
+    margin: auto;
+    background: #fff;
+  }
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+  .controls button {
+    padding: 8px 12px;
+    border-radius: 5px;
+    border: 1px solid #2f7b32;
+    background: white;
+    cursor: pointer;
+  }
+  .controls button.primary {
+    background: #2f7b32;
+    color: white;
+  }
+  /* Hide all but Print and Download PDF buttons */
+  #toggle-edit, #save-layout, #reset-layout, #clear-fields {
+    display: none;
+  }
+  .page {
+    position: relative;
+    width: 210mm;
+    height: 297mm;
+    overflow: hidden;
+    box-sizing: border-box;
+    border: 1px solid #ccc;
+  }
+  .page img.background-image {
+    position: absolute;
+    top: 0; left: 0;
+    width: 210mm;
+    height: 297mm;
+    object-fit: cover;
+    z-index: 0;
+    pointer-events: none;
+    user-select: none;
+  }
+  .overlay {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    z-index: 1;
+  }
+  .field {
+    position: absolute;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: #000;
+    font-weight: 600;
+    font-size: 14px;
+    resize: horizontal;
+    min-width: 100px;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+  /* Disable dragging and editing */
+  body.editing .field {
+    background: rgba(255,255,255,0.4);
+    border: 1px dashed #2f7b32;
+    cursor: move;
+  }
+
+  /* PRINT STYLES */
+  @media print {
+    body, html {
+      margin: 0; padding: 0;
+      width: 210mm;
+      height: 297mm;
+    }
+    .page-wrap {
+      width: 210mm;
+      height: 297mm;
+    }
+    .page {
+      page-break-inside: avoid;
+      break-inside: avoid;
+      width: 210mm;
+      height: 297mm;
+      overflow: visible;
+      border: none;
+    }
+    .page img.background-image {
+      width: 210mm;
+      height: 297mm;
+      object-fit: cover;
+    }
+    /* Hide all buttons on print */
+    #print-btn, #download-pdf, #toggle-edit, #save-layout, #reset-layout, #clear-fields {
+      display: none !important;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="page-wrap">
+  <div class="controls">
+    <button id="toggle-edit" title="Positioning disabled">Enable Positioning</button>
+    <button id="save-layout" title="Save disabled">Save Layout</button>
+    <button id="reset-layout" title="Reset disabled">Reset Layout</button>
+    <button class="primary" id="download-pdf">Download PDF</button>
+    <button id="print-btn">Print</button>
+    <button id="clear-fields" title="Clear disabled">Clear Data</button>
+  </div>
+  <div class="page">
+    <img class="background-image" src="admission_form_a4.jpg" alt="Form Background" />
+    <div class="overlay" id="overlay">
+      <!-- Inputs: style.left and style.top are defaulted here -->
+      <input class="field" id="to" placeholder="To:" />
+      <input class="field" id="from" placeholder="From:" />
+      <input class="field" id="ref" placeholder="Ref:" />
+      <input class="field" id="subject" placeholder="Subject:" />
+
+      <input class="field" id="student_name" placeholder="Student's Name" />
+      <input class="field" id="nationality" placeholder="Nationality" />
+
+      <input class="field" id="admission_no" placeholder="Admission No." />
+      <input class="field" id="nin" placeholder="NIN" />
+
+      <input class="field" id="gender" placeholder="Gender" />
+      <input class="field" id="place_of_birth" placeholder="Place of Birth" />
+
+      <input class="field" id="dob" placeholder="Date of Birth" />
+      <input class="field" id="state_of_origin" placeholder="State of origin" />
+
+      <input class="field" id="father_name" placeholder="Father's Name" />
+      <input class="field" id="lga" placeholder="LGA" />
+
+      <input class="field" id="mother_name" placeholder="Mother's Name" />
+      <input class="field" id="ward" placeholder="Ward" />
+    </div>
+  </div>
+</div>
+
+<script>
+const overlay = document.getElementById('overlay');
+const fields = document.querySelectorAll('.field');
+
+// Load saved positions (should be percentages)
+const savedPositions = JSON.parse(localStorage.getItem('form_positions') || 'null');
+if (savedPositions) {
+  Object.entries(savedPositions).forEach(([id, pos]) => {
+    const el = document.getElementById(id);
+    if (el) {
+      if (pos.left) el.style.left = pos.left;
+      if (pos.top) el.style.top = pos.top;
+      if (pos.width) el.style.width = pos.width;
+    }
+  });
+} else {
+  // No saved positions — set defaults for all fields
+  const defaultPositions = {
+    to: { left: '20.6%', top: '21.8%' },
+    from: { left: '20.6%', top: '24.6%' },
+    ref: { left: '20.6%', top: '27.6%' },
+    subject: { left: '20.6%', top: '30.4%' },
+
+    student_name: { left: '25.4%', top: '38.9%' },
+    nationality: { left: '71%', top: '38.9%' },
+
+    admission_no: { left: '25.4%', top: '41.9%' },
+    nin: { left: '71%', top: '41.9%' },
+
+    gender: { left: '25.4%', top: '44.9%' },
+    place_of_birth: { left: '71%', top: '44.9%' },
+
+    dob: { left: '25.4%', top: '48%' },
+    state_of_origin: { left: '71%', top: '48%' },
+
+    father_name: { left: '25.4%', top: '51%' },
+    lga: { left: '71%', top: '51%' },
+
+    mother_name: { left: '25.4%', top: '54%' },
+    ward: { left: '71%', top: '54%' },
+  };
+
+  Object.entries(defaultPositions).forEach(([id, pos]) => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.style.left = pos.left;
+      el.style.top = pos.top;
+    }
+  });
+}
+
+// Load saved data
+const savedData = JSON.parse(localStorage.getItem('form_data') || '{}');
+Object.entries(savedData).forEach(([id, val]) => {
+  const el = document.getElementById(id);
+  if (el) el.value = val;
+});
+
+// Autosave data
+fields.forEach(f => f.addEventListener('input', () => {
+  const data = {};
+  fields.forEach(ff => data[ff.id] = ff.value);
+  localStorage.setItem('form_data', JSON.stringify(data));
+}));
+
+// Disable editing & dragging
+let editing = false;
+document.getElementById('toggle-edit').onclick = null;
+fields.forEach(field => {
+  field.addEventListener('mousedown', e => {
+    if (!editing) return;
+  });
+});
+document.addEventListener('mousemove', e => {});
+document.addEventListener('mouseup', () => {});
+
+// Disable other buttons
+document.getElementById('save-layout').onclick = null;
+document.getElementById('reset-layout').onclick = null;
+document.getElementById('clear-fields').onclick = null;
+
+// Hide empty fields before print/pdf
+function hideEmptyFields() {
+  fields.forEach(f => {
+    if (!f.value.trim()) {
+      f.style.display = 'none';
+    }
+  });
+}
+// Restore fields display
+function restoreFieldsDisplay() {
+  fields.forEach(f => {
+    f.style.display = '';
+  });
+}
+
+// Print button: hide empties, print, restore
+document.getElementById('print-btn').onclick = () => {
+  hideEmptyFields();
+  setTimeout(() => {
+    window.print();
+    restoreFieldsDisplay();
+  }, 100);
+};
+
+// Download PDF: hide empties, generate PDF, restore
+document.getElementById('download-pdf').onclick = () => {
+  hideEmptyFields();
+  if (typeof html2pdf === 'undefined') {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.2/html2pdf.bundle.min.js';
+    document.body.appendChild(s);
+    s.onload = () => {
+      makePDF();
+    };
+  } else {
+    makePDF();
+  }
+};
+
+function makePDF() {
+  html2pdf().set({
+    filename: 'admission_form.pdf',
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+  }).from(document.querySelector('.page')).save().finally(() => {
+    restoreFieldsDisplay();
+  });
+}
+</script>
+</body>
+</html>
